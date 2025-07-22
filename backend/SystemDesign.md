@@ -242,3 +242,13 @@ Search and Analytics:
 Integrate with dedicated search engines (e.g., Elasticsearch) for complex search queries on assignments or submissions.
 
 Use data warehousing solutions for analytics and reporting.
+
++------------+       +----------------+        +-----------------+
+|   User     |<----- |   Assignment   | <----- |   Submission    |
++------------+       +----------------+        +-----------------+
+| id         |       | id             |        | id              |
+| name       |       | title          |        | assignment_id FK|
+| email      |       | description    |        | student_id FK   |
+| password   |       | due_date       |        | content         |
+| role       |       | created_by FK  |        | submitted_at    |
++------------+       +----------------+        +-----------------+
