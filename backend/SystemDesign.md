@@ -1,254 +1,212 @@
-EdTech Assignment Tracker: System Design
-Objective
-To design and implement a simplified assignment tracking system for an EdTech platform, allowing teachers to post assignments and students to submit them.
-
 Part A: System Design
-1. Core Entities and Their Relationships
-We will define three primary entities: User, Assignment, and Submission.
+Core Entities and Relationships
+Entities:
 
-User: Represents individuals interacting with the system. Each user has a role (either 'teacher' or 'student').
+User
 
-Attributes:
+id (PK)
 
-id (Integer, Primary Key, Auto-increment)
+username
 
-email (String, Unique)
+email
 
-password_hash (String - stores hashed password)
+password_hash
 
-name (String)
+role (teacher/student)
 
-role (String, Enum: 'teacher', 'student')
+created_at
 
-token (String, Unique, Nullable - for session management)
+Assignment
 
-created_at (Timestamp)
+id (PK)
 
-updated_at (Timestamp)
+title
 
-Assignment: Represents a task created by a teacher for students to complete.
+description
 
-Attributes:
+due_date
 
-id (Integer, Primary Key, Auto-increment)
+created_at
 
-teacher_id (Integer, Foreign Key to User.id - where User.role='teacher')
+teacher_id (FK to User)
 
-title (String)
+max_points
 
-description (Text)
+Submission
 
-due_date (DateTime)
+id (PK)
 
-created_at (Timestamp)
+assignment_id (FK to Assignment)
 
-updated_at (Timestamp)
+student_id (FK to User)
 
-Submission: Represents a student's completed work for a specific assignment.
+content (text or file reference)
 
-Attributes:
+submitted_at
 
-id (Integer, Primary Key, Auto-increment)
+grade (nullable)
 
-assignment_id (Integer, Foreign Key to Assignment.id)
-
-student_id (Integer, Foreign Key to User.id - where User.role='student')
-
-content (Text - for text-based submissions; could be a URL/path for file uploads in a scaled system)
-
-submitted_at (DateTime)
-
-grade (Float, Optional)
-
-feedback (Text, Optional)
-
-created_at (Timestamp)
-
-updated_at (Timestamp)
+feedback (nullable)
 
 Relationships:
 
-One-to-Many (User to Assignment): A Teacher (User with role='teacher') can create multiple Assignments. (User.id -> Assignment.teacher_id)
+One Teacher (User) can create Many Assignments (1:N)
 
-Many-to-Many (Assignment to Student via Submission): An Assignment can have multiple Submissions from different Students. A Student (User with role='student') can make Submissions to multiple Assignments.
+One Assignment can have Many Submissions (1:N)
 
-One-to-One (Student to Submission per Assignment): Typically, a student submits only one Submission per Assignment (enforced by application logic).
+One Student (User) can submit Many Submissions (1:N)
 
-2. API Endpoints
-We will follow RESTful principles for our API design. All responses will be structured JSON.
+API Endpoints
 
-Authentication & User Management:
-
-POST /api/signup
-
-Description: Registers a new user (teacher or student).
-
-Request Body: {"email": "...", "password": "...", "name": "...", "role": "teacher" | "student"}
-
-Response: {"message": "User created successfully", "user_id": 123}
-
-Error Responses: {"error": "Email already registered"}
-
-POST /api/login
-
-Description: Authenticates a user and issues an access token.
-
-Request Body: {"email": "...", "password": "..."}
-
-Response: {"message": "Login successful", "token": "abc123xyz", "user_id": 123, "role": "student", "name": "John Doe"}
-
-Error Responses: {"error": "Invalid credentials"}
-
-GET /api/user
-
-Description: Retrieves details of the currently authenticated user.
-
-Headers: Authorization: Bearer <token>
-
-Response: {"user_id": 123, "email": "...", "name": "...", "role": "..."}
-
-Error Responses: {"error": "Unauthorized"}
-
-Assignment Management (Teacher Only for Creation/Management, All for Viewing):
+1. Teacher Creates an Assignment
 
 POST /api/assignments
+Headers:
+  Authorization: Bearer <teacher_token>
+  
+Request Body:
+{
+  "title": "Math Homework",
+  "description": "Solve problems 1-10",
+  "due_date": "2023-12-15T23:59:00Z",
+  "max_points": 100
+}
 
-Description: Teacher creates a new assignment.
+Response (201 Created):
+{
+  "id": "123",
+  "title": "Math Homework",
+  "description": "Solve problems 1-10",
+  "due_date": "2023-12-15T23:59:00Z",
+  "created_at": "2023-11-01T10:00:00Z",
+  "teacher_id": "teacher123",
+  "max_points": 100
+}
 
-Headers: Authorization: Bearer <token>
+2. Student Submits Assignment
 
-Request Body: {"title": "...", "description": "...", "due_date": "YYYY-MM-DDTHH:MM:SS"}
+POST /api/assignments/{assignment_id}/submissions
+Headers:
+  Authorization: Bearer <student_token>
+  
+Request Body:
+{
+  "content": "Here are my solutions...",
+  // or for file uploads
+  "file_url": "https://storage.example.com/files/submission123.pdf"
+}
 
-Response: {"message": "Assignment created", "assignment_id": 456}
+Response (201 Created):
+{
+  "id": "sub456",
+  "assignment_id": "123",
+  "student_id": "student789",
+  "content": "Here are my solutions...",
+  "submitted_at": "2023-12-14T15:30:00Z",
+  "grade": null,
+  "feedback": null
+}
 
-Error Responses: {"error": "Unauthorized", "details": "Only teachers can create assignments"}
+3. Teacher Views Submissions
 
-GET /api/assignments
+GET /api/assignments/{assignment_id}/submissions
+Headers:
+  Authorization: Bearer <teacher_token>
 
-Description: Retrieves a list of all assignments.
+Response (200 OK):
+{
+  "assignment": {
+    "id": "123",
+    "title": "Math Homework",
+    "description": "Solve problems 1-10",
+    "due_date": "2023-12-15T23:59:00Z"
+  },
+  "submissions": [
+    {
+      "id": "sub456",
+      "student_id": "student789",
+      "student_name": "John Doe",
+      "content": "Here are my solutions...",
+      "submitted_at": "2023-12-14T15:30:00Z",
+      "grade": null,
+      "feedback": null
+    },
+    // ... more submissions
+  ]
+}
 
-Headers: Authorization: Bearer <token>
+Authentication Strategy
+JWT (JSON Web Token) Based Authentication:
 
-Response: [{"id": 456, "title": "...", "description": "...", "due_date": "...", "teacher_name": "..."}]
+Users login with credentials and receive a JWT containing:
 
-Submission Management (Student for Submission, Teacher for Viewing/Grading):
+User ID
 
-POST /api/assignments/<int:assignment_id>/submit
+Role (teacher/student)
 
-Description: Student submits work for a specific assignment.
+Expiration time
 
-Headers: Authorization: Bearer <token>
+All API endpoints require a valid JWT in the Authorization header
 
-Request Body: {"content": "..."}
+Role-based access control:
 
-Response: {"message": "Assignment submitted", "submission_id": 789}
+Teacher-only endpoints check for role: teacher
 
-Error Responses: {"error": "Unauthorized", "details": "Only students can submit assignments"}
+Student-only endpoints check for role: student
 
-Error Responses: {"error": "Assignment not found"}
+Some endpoints may be accessible to both with different behavior
 
-GET /api/assignments/<int:assignment_id>/submissions
+Password storage:
 
-Description: Teacher views all submissions for a specific assignment.
+Passwords are hashed with bcrypt or similar before storage
 
-Headers: Authorization: Bearer <token>
-
-Response: [{"id": 789, "student_id": 124, "student_name": "...", "content": "...", "submitted_at": "...", "grade": null, "feedback": null}]
-
-Error Responses: {"error": "Unauthorized", "details": "Only teachers can view submissions"}
-
-Error Responses: {"error": "Assignment not found"}
-
-Error Responses: {"error": "Forbidden", "details": "You do not own this assignment"}
-
-PUT /api/submissions/<int:submission_id>/grade
-
-Description: Teacher grades a specific submission and provides feedback.
-
-Headers: Authorization: Bearer <token>
-
-Request Body: {"grade": 95.0, "feedback": "Excellent work!"}
-
-Response: {"message": "Submission graded successfully"}
-
-Error Responses: {"error": "Unauthorized", "details": "Only teachers can grade submissions"}
-
-Error Responses: {"error": "Submission not found"}
-
-Error Responses: {"error": "Forbidden", "details": "You do not own the assignment for this submission"}
-
-3. Authentication Strategy (Role-Based)
-Mechanism: Token-based authentication.
-
-Login/Signup: Upon successful login or signup, the server generates a unique, random token for the user. This token is stored in the User table and sent back to the client.
-
-Client Storage: The client stores this token (e.g., in localStorage).
-
-Subsequent Requests: For every subsequent API request that requires authentication, the client includes the token in the Authorization header as Bearer <token>.
-
-Server Verification: The server intercepts these requests, extracts the token, looks up the user associated with that token in the database.
-
-Authorization: Based on the role attribute of the authenticated User, the server determines if the user has permission to perform the requested action.
-
-Teacher Role: Can create assignments, view all submissions for their own assignments, and grade submissions for their own assignments.
-
-Student Role: Can view available assignments, submit assignments, and view their own submissions.
-
-4. Suggestions for Scaling the System in the Future
+Suggestions for Scaling the System
 Database Scaling:
 
-PostgreSQL: Migrate from SQLite to PostgreSQL for better concurrency, robustness, and features like replication and sharding.
+Implement read replicas for the database to handle increased read loads
 
-Read Replicas: For read-heavy operations (e.g., students viewing assignments), use read replicas to offload queries from the primary database.
+Consider sharding by school or region if the user base grows large
 
-Database Sharding/Partitioning: Distribute data across multiple database instances based on criteria (e.g., by institution, course, or user ID ranges) to handle increased load.
-
-Backend Architecture:
-
-Microservices: Break down the monolithic Flask application into smaller, independent services (e.g., User Service, Assignment Service, Submission Service). Each service can be developed, deployed, and scaled independently. This improves fault isolation and team agility.
-
-API Gateway: Introduce an API Gateway (e.g., Nginx, Kong, AWS API Gateway) to handle request routing, authentication, rate limiting, and caching before requests reach individual microservices.
-
-Caching:
-
-CDN (Content Delivery Network): Cache static assets (HTML, CSS, JS, images) closer to users for faster delivery.
-
-In-memory Caching: Use tools like Redis or Memcached to cache frequently accessed data (e.g., assignment lists, user profiles) to reduce database load and improve response times.
-
-Load Balancing:
-
-Distribute incoming network traffic across multiple application servers to ensure no single server becomes a bottleneck, improving availability and responsiveness.
-
-Asynchronous Processing:
-
-Message Queues: Use message queues (e.g., RabbitMQ, Kafka, Celery with Redis/RabbitMQ) for long-running or non-real-time tasks (e.g., sending email notifications for new assignments, processing file uploads, generating reports). This prevents blocking the main application thread.
+Add caching (Redis) for frequently accessed assignments and submissions
 
 File Storage:
 
-For file uploads (e.g., student submissions), integrate with cloud storage solutions like AWS S3, Google Cloud Storage, or Azure Blob Storage, storing only file URLs in the database.
+Use object storage (S3, GCS) for file submissions rather than database storage
 
-Monitoring & Logging:
+Implement a CDN for faster distribution of assignment materials
 
-Implement robust monitoring and logging solutions (e.g., Prometheus, Grafana, ELK Stack) to track system performance, identify bottlenecks, and troubleshoot issues proactively.
+API Scaling:
 
-Security Enhancements:
+Move to microservices architecture as features grow (separate services for assignments, submissions, grading, etc.)
 
-Implement stricter rate limiting, CSRF protection, and more comprehensive input validation.
+Implement API gateway for routing and rate limiting
 
-Regular security audits and penetration testing.
+Add queue systems (RabbitMQ, SQS) for asynchronous processing of large submissions
 
-Search and Analytics:
+Performance:
 
-Integrate with dedicated search engines (e.g., Elasticsearch) for complex search queries on assignments or submissions.
+Add pagination to submission lists
 
-Use data warehousing solutions for analytics and reporting.
+Implement lazy loading for assignment attachments
 
-+------------+       +----------------+        +-----------------+
-|   User     |<----- |   Assignment   | <----- |   Submission    |
-+------------+       +----------------+        +-----------------+
-| id         |       | id             |        | id              |
-| name       |       | title          |        | assignment_id FK|
-| email      |       | description    |        | student_id FK   |
-| password   |       | due_date       |        | content         |
-| role       |       | created_by FK  |        | submitted_at    |
-+------------+       +----------------+        +-----------------+
+Consider GraphQL for more efficient data fetching
+
+Monitoring:
+
+Implement comprehensive logging and monitoring
+
+Set up alerts for unusual activity patterns
+
+Availability:
+
+Deploy across multiple availability zones
+
+Implement database failover mechanisms
+
+Future Features:
+
+Add plagiarism detection integration
+
+Implement real-time notifications for new assignments/submissions
+
+Add collaborative features like peer review
